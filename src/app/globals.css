@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #12131a;
+  --color-surface: #181a24;
+  --color-panel: #1f2230;
+  --color-border: #2a2e3f;
+  --color-accent: #5b8def;
+  --color-accent2: #f2a65a;
+  --color-muted: #8b8fa3;
+  --color-good: #4cbb8a;
+  --color-warn: #e0a63c;
+  --color-bad: #e2617b;
+
+  --font-display: var(--font-display-src);
+  --font-body: var(--font-body-src);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: #12131a;
+  color: #e6e7ee;
+}
+
+::selection {
+  background: #5b8def;
+  color: #12131a;
+}
+
+@layer components {
+  .card {
+    @apply bg-panel border border-border rounded-xl p-5;
+  }
+
+  .stat-label {
+    @apply text-xs uppercase tracking-wider text-muted font-medium;
+  }
+
+  .btn-primary {
+    @apply bg-accent text-ink font-semibold rounded-lg px-4 py-2 text-sm hover:opacity-90 transition;
+  }
+
+  .btn-secondary {
+    @apply bg-panel border border-border text-white rounded-lg px-4 py-2 text-sm hover:border-accent transition;
+  }
+
+  .input {
+    @apply bg-surface border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent w-full;
+  }
+
+  .badge {
+    @apply text-xs font-semibold px-2 py-1 rounded-full;
+  }
+}
+
+table.data-table {
+  @apply w-full text-sm;
+}
+table.data-table th {
+  @apply text-left text-xs uppercase tracking-wide text-muted font-medium pb-3 pr-4 border-b border-border;
+}
+table.data-table td {
+  @apply py-3 pr-4 border-b border-border/60;
+}

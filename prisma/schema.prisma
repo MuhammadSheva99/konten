@@ -1,0 +1,312 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  PIC
+}
+
+enum AkunStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AkunCategory {
+  OFFICIAL
+  OUTLET
+  DRACIN
+}
+
+enum ContentStatus {
+  DRAFT
+  EDITING
+  APPROVAL
+  SCHEDULED
+  POSTED
+}
+
+enum ContentPriority {
+  URGENT
+  TINGGI
+  NORMAL
+  RENDAH
+}
+
+enum ApprovalStatus {
+  APPROVED
+  REJECTED
+}
+
+enum PerformanceSource {
+  MANUAL
+  API
+}
+
+enum KpiScopeType {
+  PIC
+  BRAND
+  AKUN
+}
+
+enum KpiComputeType {
+  AUTO_POSTING_COUNT
+  AUTO_TOTAL_VIEWS
+  AUTO_ENGAGEMENT_RATE
+  AUTO_HEALTHY_ACCOUNTS
+  AUTO_FOLLOWER_GROWTH_ABS
+  AUTO_FOLLOWER_GROWTH_PCT
+  MANUAL
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  username  String?  @unique
+  password  String?
+  role      Role
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  akun               Akun[]
+  targetKpis         TargetKpi[]
+  contentPlans       ContentPlan[]
+  pendingApprovals   PendingApproval[]      @relation("SubmittedBy")
+  approvalDecisions  ApprovalHistory[]      @relation("DecidedBy")
+  activityLogs       ActivityLog[]
+  draftStocks        DraftStock[]
+}
+
+model Brand {
+  id       String  @id @default(cuid())
+  name     String  @unique
+  isActive Boolean @default(true)
+
+  akun             Akun[]
+  targetKpis       TargetKpi[]
+  contentPlans     ContentPlan[]
+  postings         Posting[]
+  pendingApprovals PendingApproval[]
+  draftStocks      DraftStock[]
+}
+
+model Platform {
+  id   String @id @default(cuid())
+  name String @unique
+
+  akun         Akun[]
+  contentPlans ContentPlan[]
+  postings     Posting[]
+  performances Performance[]
+}
+
+model Akun {
+  id           String       @id @default(cuid())
+  username     String
+  status       AkunStatus   @default(ACTIVE)
+  category     AkunCategory @default(OFFICIAL)
+  apiConnected Boolean      @default(false)
+  lastPostAt   DateTime?
+
+  tiktokOpenId         String?
+  tiktokAccessToken    String?
+  tiktokRefreshToken   String?
+  tiktokTokenExpiresAt DateTime?
+
+  brandId    String
+  brand      Brand    @relation(fields: [brandId], references: [id])
+
+  platformId String
+  platform   Platform @relation(fields: [platformId], references: [id])
+
+  picId      String?
+  pic        User?    @relation(fields: [picId], references: [id])
+
+  contentPlans      ContentPlan[]
+  postings          Posting[]
+  performances      Performance[]
+  pendingApprovals  PendingApproval[]
+  followerSnapshots AkunFollowerSnapshot[]
+
+  @@unique([username, platformId])
+}
+
+model AkunFollowerSnapshot {
+  id            String   @id @default(cuid())
+  akunId        String
+  akun          Akun     @relation(fields: [akunId], references: [id])
+  date          DateTime
+  followerCount Int
+
+  @@unique([akunId, date])
+}
+
+model TargetKpi {
+  id            String @id @default(cuid())
+  period        String
+  targetPosting Int
+  targetViews   Int
+  targetLeads   Int
+
+  picId   String
+  pic     User  @relation(fields: [picId], references: [id])
+
+  brandId String
+  brand   Brand @relation(fields: [brandId], references: [id])
+}
+
+model ContentPlan {
+  id            String          @id @default(cuid())
+  title         String
+  scheduledDate DateTime
+  status        ContentStatus   @default(DRAFT)
+  priority      ContentPriority @default(NORMAL)
+
+  brandId    String
+  brand      Brand    @relation(fields: [brandId], references: [id])
+
+  platformId String
+  platform   Platform @relation(fields: [platformId], references: [id])
+
+  akunId     String
+  akun       Akun     @relation(fields: [akunId], references: [id])
+
+  picId      String
+  pic        User     @relation(fields: [picId], references: [id])
+}
+
+model Posting {
+  id            String   @id @default(cuid())
+  link          String
+  tiktokVideoId String?  @unique
+  postedAt      DateTime
+
+  brandId    String
+  brand      Brand    @relation(fields: [brandId], references: [id])
+
+  platformId String
+  platform   Platform @relation(fields: [platformId], references: [id])
+
+  akunId     String
+  akun       Akun     @relation(fields: [akunId], references: [id])
+}
+
+model Performance {
+  id            String            @id @default(cuid())
+  tiktokVideoId String?           @unique
+  date          DateTime
+  views         Int
+  likes         Int
+  comments      Int
+  shares        Int
+  saves         Int
+  profileVisit  Int
+  websiteClick  Int
+  follows       Int
+  leadsWaDm     Int
+  source        PerformanceSource @default(MANUAL)
+
+  akunId     String
+  akun       Akun     @relation(fields: [akunId], references: [id])
+
+  platformId String
+  platform   Platform @relation(fields: [platformId], references: [id])
+}
+
+model PendingApproval {
+  id       String @id @default(cuid())
+  title    String
+  revision Int    @default(1)
+
+  brandId String
+  brand   Brand  @relation(fields: [brandId], references: [id])
+
+  akunId String
+  akun   Akun   @relation(fields: [akunId], references: [id])
+
+  submittedById String
+  submittedBy   User   @relation("SubmittedBy", fields: [submittedById], references: [id])
+}
+
+model ApprovalHistory {
+  id     String         @id @default(cuid())
+  title  String
+  status ApprovalStatus
+  note   String?
+  date   DateTime
+
+  decidedById String
+  decidedBy   User   @relation("DecidedBy", fields: [decidedById], references: [id])
+}
+
+model ActivityLog {
+  id     String   @id @default(cuid())
+  time   DateTime @default(now())
+  action String
+  entity String
+  detail String
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model DraftStock {
+  id        String @id @default(cuid())
+  linkDraft String
+
+  brandId String
+  brand   Brand  @relation(fields: [brandId], references: [id])
+
+  picId String
+  pic   User   @relation(fields: [picId], references: [id])
+
+  weeks DraftStockWeek[]
+}
+
+model DraftStockWeek {
+  id    String @id @default(cuid())
+  label String
+  count Int
+
+  draftStockId String
+  draftStock   DraftStock @relation(fields: [draftStockId], references: [id])
+}
+
+model KpiTemplate {
+  id       String            @id @default(cuid())
+  name     String
+  category AkunCategory
+  items    KpiTemplateItem[]
+}
+
+model KpiTemplateItem {
+  id                String           @id @default(cuid())
+  templateId        String
+  template          KpiTemplate      @relation(fields: [templateId], references: [id])
+  order             Int
+  name              String
+  metricDescription String
+  weight            Float
+  targetLabel       String
+  targetNumeric     Float?
+  computeType       KpiComputeType
+  manualInputs      KpiManualInput[]
+}
+
+model KpiManualInput {
+  id             String          @id @default(cuid())
+  templateItemId String
+  templateItem   KpiTemplateItem @relation(fields: [templateItemId], references: [id])
+  scopeType      KpiScopeType
+  scopeId        String
+  period         String
+  value          Float
+  updatedAt      DateTime        @updatedAt
+
+  @@unique([templateItemId, scopeType, scopeId, period])
+}
