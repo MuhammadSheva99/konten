@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Cookies from "js-cookie";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -31,16 +30,14 @@ export default function LoginPage() {
         return;
       }
 
-      const role = data.role;
-      if (role === "ADMIN") {
-        Cookies.set("admin_session", JSON.stringify(data), { expires: 1 });
+      if (data.role === "ADMIN") {
         router.push("/master-data");
-      } else if (role === "PIC") {
-        Cookies.set("pic_session", JSON.stringify(data), { expires: 1 });
+      } else if (data.role === "PIC") {
         router.push("/portal");
       } else {
         setError("Akun ini tidak memiliki akses ke portal ini");
       }
+      router.refresh();
     } catch {
       setError("Gagal koneksi ke server");
     } finally {

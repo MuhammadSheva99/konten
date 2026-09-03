@@ -1,21 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/session";
 
 type ScopeType = "PIC" | "BRAND" | "AKUN";
 
-async function getAkunIdsForScope(scopeType: ScopeType, scopeId: string): Promise<string[]> {
+async function getAkunIdsForScope(
+  scopeType: ScopeType,
+  scopeId: string,
+  category?: string
+): Promise<string[]> {
+  const categoryFilter = category ? { category: category as "OFFICIAL" | "OUTLET" | "DRACIN" } : {};
+
   if (scopeType === "AKUN") return [scopeId];
   if (scopeType === "BRAND") {
-    const akun = await prisma.akun.findMany({ where: { brandId: scopeId }, select: { id: true } });
+    const akun = await prisma.akun.findMany({
+      where: { brandId: scopeId, ...categoryFilter },
+      select: { id: true },
+    });
     return akun.map((a) => a.id);
   }
-  // PIC
-  const akun = await prisma.akun.findMany({ where: { picId: scopeId }, select: { id: true } });
+  const akun = await prisma.akun.findMany({
+    where: { picId: scopeId, ...categoryFilter },
+    select: { id: true },
+  });
   return akun.map((a) => a.id);
 }
 
 function getPeriodRange(period: string) {
-  // period format: "YYYY-MM"
   const [year, month] = period.split("-").map(Number);
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0, 23, 59, 59, 999);
@@ -23,10 +34,20 @@ function getPeriodRange(period: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const { templateId, scopeType, scopeId, period } = await req.json();
+  const body = await req.json();
+  let { scopeId } = body;
+  const { templateId, scopeType, period, category } = body;
 
   if (!templateId || !scopeType || !scopeId || !period) {
     return NextResponse.json({ error: "Parameter tidak lengkap" }, { status: 400 });
+  }
+
+  if (scopeType === "PIC" && scopeId === "me") {
+    const session = await getSession();
+    if (!session.userId || session.role !== "PIC") {
+      return NextResponse.json({ error: "Sesi tidak valid." }, { status: 401 });
+    }
+    scopeId = session.userId;
   }
 
   const template = await prisma.kpiTemplate.findUnique({
@@ -37,7 +58,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Template tidak ditemukan" }, { status: 404 });
   }
 
-  const akunIds = await getAkunIdsForScope(scopeType, scopeId);
+  const akunIds = await getAkunIdsForScope(scopeType, scopeId, category);
   const { start, end } = getPeriodRange(period);
 
   const results = [];
@@ -118,7 +139,6 @@ export async function POST(req: NextRequest) {
         realisasiLabel = `${pct.toFixed(1)}%`;
       }
     } else {
-      // MANUAL
       const manual = await prisma.kpiManualInput.findUnique({
         where: {
           templateItemId_scopeType_scopeId_period: {
@@ -134,7 +154,15 @@ export async function POST(req: NextRequest) {
     }
 
     const target = item.targetNumeric ?? 0;
-    const score = target > 0 ? Math.min(realisasi / target, 1) * item.weight : 0;
+    const isLowerBetter = item.name === "Efisiensi Boost Post";
+    let score = 0;
+    if (target > 0) {
+      if (isLowerBetter && realisasi > 0) {
+        score = Math.min(target / realisasi, 1) * item.weight;
+      } else if (!isLowerBetter) {
+        score = Math.min(realisasi / target, 1) * item.weight;
+      }
+    }
     totalScore += score;
 
     results.push({

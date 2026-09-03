@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { getSession } from "@/lib/session";
 
 export async function POST(req: NextRequest) {
   const { username, password } = await req.json();
@@ -24,10 +25,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Username atau password salah" }, { status: 401 });
   }
 
+  // Simpan session di server (signed, httpOnly)
+  const session = await getSession();
+  session.userId = user.id;
+  session.name = user.name;
+  session.username = user.username!;
+  session.role = user.role;
+  await session.save();
+
   return NextResponse.json({
-    id: user.id,
     name: user.name,
     username: user.username,
-    role: user.role, // "ADMIN" | "PIC"
+    role: user.role,
   });
 }
